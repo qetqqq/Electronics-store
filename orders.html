@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мои заказы</title>
+    <style>
+        body { font-family: Arial; background: #f0f2f5; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 800px; margin: 0 auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: #eee; }
+        a { text-decoration: none; color: #2196F3; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="/">← Назад в каталог</a>
+    <h2>История моих заказов</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Номер заказа</th>
+            <th>Товар</th>
+            <th>Количество</th>
+            <th>Дата</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for o in orders %}
+        <tr>
+            <td>{{ o.id }}</td>
+            <td>{{ o.model }}</td>
+            <td>{{ o.quantity }}</td>
+            <td>{{ o.order_date }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">У вас пока нет заказов.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
