@@ -4,11 +4,10 @@ import mysql.connector
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_tech_shop'
 
-# Впиши свой пароль от MySQL
 db_config = {
     "host": "127.0.0.1",
     "user": "root",
-    "password": "1234",
+    "password": "1234", # <--- ТВОЙ ПАРОЛЬ
     "database": "tech_shop_db"
 }
 
@@ -25,7 +24,6 @@ def index():
 
     conn = get_db()
     cur = conn.cursor(dictionary=True)
-
     cur.execute("SELECT * FROM categories")
     categories = cur.fetchall()
 
@@ -45,7 +43,10 @@ def index():
     products = cur.fetchall()
     conn.close()
 
-    return render_template('index.html', products=products, categories=categories, search=search)
+    # Считаем количество товаров в корзине для отображения на кнопке
+    cart_count = sum(session.get('cart', {}).values())
+
+    return render_template('index.html', products=products, categories=categories, search=search, cart_count=cart_count)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -70,6 +71,7 @@ def login():
             if user:
                 session['user_id'] = user['id']
                 session['role_id'] = user['role_id']
+                session['cart'] = {} # Очищаем корзину при входе
                 conn.close()
                 return redirect(url_for('index'))
             else:
@@ -82,6 +84,93 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+# --- ДОБАВЛЕНИЕ В КОРЗИНУ ---
+@app.route('/add_to_cart/<int:product_id>')
+def add_to_cart(product_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    # Если корзины нет, создаем пустой словарь
+    if 'cart' not in session:
+        session['cart'] = {}
+
+    cart = session['cart']
+    # Увеличиваем количество товара (ключи в JSON становятся строками)
+    str_id = str(product_id)
+    cart[str_id] = cart.get(str_id, 0) + 1
+    session['cart'] = cart # Сохраняем изменения
+
+    flash('Товар добавлен в корзину!', 'success')
+    return redirect(url_for('index'))
+
+# --- ПРОСМОТР КОРЗИНЫ ---
+@app.route('/cart')
+def cart():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    cart = session.get('cart', {})
+    cart_items = []
+    total_price = 0
+
+    if cart:
+        conn = get_db()
+        cur = conn.cursor(dictionary=True)
+        # Формируем запрос для получения данных о товарах в корзине
+        format_strings = ','.join(['%s'] * len(cart))
+        cur.execute(f"SELECT id, model, price FROM products WHERE id IN ({format_strings})", tuple(cart.keys()))
+        products = cur.fetchall()
+
+        for p in products:
+            qty = cart[str(p['id'])]
+            p['quantity'] = qty
+            p['sum'] = p['price'] * qty
+            total_price += p['sum']
+            cart_items.append(p)
+        conn.close()
+
+    return render_template('cart.html', cart_items=cart_items, total_price=total_price)
+
+# --- УДАЛЕНИЕ ИЗ КОРЗИНЫ ---
+@app.route('/remove_from_cart/<int:product_id>')
+def remove_from_cart(product_id):
+    if 'cart' in session:
+        cart = session['cart']
+        str_id = str(product_id)
+        if str_id in cart:
+            del cart[str_id]
+            session['cart'] = cart
+    return redirect(url_for('cart'))
+
+# --- ОФОРМЛЕНИЕ ЗАКАЗА ИЗ КОРЗИНЫ ---
+@app.route('/checkout')
+def checkout():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    cart = session.get('cart', {})
+    if not cart:
+        flash('Корзина пуста!', 'danger')
+        return redirect(url_for('cart'))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Создаем заказ
+    cur.execute("INSERT INTO orders (user_id, order_date, status) VALUES (%s, NOW(), 'Оплачен')", (session['user_id'],))
+    order_id = cur.lastrowid
+
+    # Добавляем все товары из корзины в заказ
+    for product_id, quantity in cart.items():
+        cur.execute("INSERT INTO order_items (order_id, product_id, quantity) VALUES (%s, %s, %s)", (order_id, product_id, quantity))
+
+    conn.commit()
+    conn.close()
+
+    session['cart'] = {} # Очищаем корзину
+    flash('Заказ успешно оформлен!', 'success')
+    return redirect(url_for('orders'))
 
 @app.route('/orders')
 def orders():
@@ -102,22 +191,6 @@ def orders():
     conn.close()
 
     return render_template('orders.html', orders=user_orders)
-
-@app.route('/buy/<int:product_id>')
-def buy(product_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO orders (user_id, order_date, status) VALUES (%s, NOW(), 'Оплачен')", (session['user_id'],))
-    order_id = cur.lastrowid
-    cur.execute("INSERT INTO order_items (order_id, product_id, quantity) VALUES (%s, %s, 1)", (order_id, product_id))
-    conn.commit()
-    conn.close()
-
-    flash('Товар добавлен в ваши заказы!', 'success')
-    return redirect(url_for('index'))
 
 @app.route('/add_product', methods=['GET', 'POST'])
 def add_product():

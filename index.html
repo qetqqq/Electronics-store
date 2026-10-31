@@ -8,26 +8,29 @@
         .header { background: white; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .filters { display: flex; gap: 10px; }
         input, select, button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        button { background: #2196F3; color: white; border: none; cursor: pointer; }
+
+        /* Кнопки меню */
+        button { background: #2196F3; color: white; border: none; cursor: pointer; font-weight: bold; }
         button.add { background: #4CAF50; }
+        button.cart { background: #FF9800; }
         button.logout { background: #F44336; }
 
-        /* Стили для таблицы */
+        /* Таблица */
         table { width: 100%; background: white; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #eee; }
 
-        /* Стили для кнопки Купить */
-        .btn-buy { background: #E8F5E9; color: #2E7D32; font-weight: bold; text-decoration: none; padding: 6px 12px; border-radius: 4px; border: 1px solid #A5D6A7; display: inline-block; }
+        /* Кнопка "В корзину" */
+        .btn-buy { background: #E8F5E9; color: #2E7D32; font-weight: bold; text-decoration: none; padding: 6px 12px; border-radius: 4px; border: 1px solid #A5D6A7; display: inline-block; text-align: center; }
         .btn-buy:hover { background: #C8E6C9; }
 
-        /* Стили для зеленого сообщения об успехе */
+        /* Уведомления */
         .alert-success { background-color: #d4edda; color: #155724; padding: 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #c3e6cb; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<!-- Вывод сообщения об успешной покупке -->
+<!-- Вывод сообщения (Товар добавлен в корзину) -->
 {% with messages = get_flashed_messages() %}
 {% if messages %}
 <div class="alert-success">{{ messages[0] }}</div>
@@ -41,16 +44,21 @@
             <select name="category">
                 <option value="">Все категории</option>
                 {% for cat in categories %}
-                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                <!-- Проверка, чтобы выбранная категория оставалась в списке -->
+                <option value="{{ cat.id }}" {% if request.args.get('category') == cat.id|string %}selected{% endif %}>{{ cat.name }}</option>
                 {% endfor %}
             </select>
             <button type="submit">Найти</button>
         </form>
     </div>
-    <div>
+    <div style="display: flex; gap: 10px;">
         {% if session.get('role_id') == 1 %}
         <a href="/add_product"><button class="add">Добавить товар</button></a>
         {% endif %}
+
+        <!-- Кнопка Корзины с количеством товаров -->
+        <a href="/cart"><button class="cart">Корзина ({{ cart_count }})</button></a>
+
         <a href="/orders"><button>Мои заказы</button></a>
         <a href="/logout"><button class="logout">Выйти</button></a>
     </div>
@@ -76,9 +84,13 @@
         <td>{{ p.manufacturer }}</td>
         <td>{{ "%.2f"|format(p.price) }} руб.</td>
         <td>
-            <!-- Кнопка покупки: это ссылка, которая переходит на /buy/id -->
-            <a href="/buy/{{ p.id }}" class="btn-buy">Купить</a>
+            <!-- Ссылка ведет на добавление в корзину -->
+            <a href="/add_to_cart/{{ p.id }}" class="btn-buy">В корзину</a>
         </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="6" style="text-align: center; padding: 20px;">Товары не найдены</td>
     </tr>
     {% endfor %}
     </tbody>
